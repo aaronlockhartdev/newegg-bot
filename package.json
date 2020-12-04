@@ -1,0 +1,23 @@
+{
+  "name": "newegg-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cy:run": "cypress open"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aaronlockhartdev/newegg-bot.git"
+  },
+  "author": "aaronlockhartdev",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aaronlockhartdev/newegg-bot/issues"
+  },
+  "homepage": "https://github.com/aaronlockhartdev/newegg-bot#readme",
+  "devDependencies": {
+    "cypress": "^6.0.1"
+  }
+}
