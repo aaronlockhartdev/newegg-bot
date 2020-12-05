@@ -4,7 +4,8 @@
   "description": "Auto checkout bot for newegg using cypress",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "cy:newegg_bot": "cypress run -s cypress/integration/newegg_bot.spec.js --headless"
   },
   "repository": {
     "type": "git",
@@ -18,5 +19,10 @@
   "homepage": "https://github.com/aaronlockhartdev/newegg-bot#readme",
   "devDependencies": {
     "cypress": "^6.0.1"
+  },
+  "dependencies": {
+    "axios": "^0.21.0",
+    "cheerio": "^1.0.0-rc.3",
+    "yargs": "^16.1.1"
   }
 }
