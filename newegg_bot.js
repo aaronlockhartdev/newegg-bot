@@ -3,36 +3,57 @@ const puppeteer = require('puppeteer-extra');
 const config = require('./config/puppeteer.json');
 
 // add stealth plugin and use defaults (all evasion techniques)
-const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-puppeteer.use(StealthPlugin())
-const pluginStealth = require('puppeteer-extra-plugin-stealth')()
-console.log(pluginStealth.availableEvasions)
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+puppeteer.use(StealthPlugin());
 
 // add recaptcha solver
-const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha')
+const RecaptchaPlugin = require('puppeteer-extra-plugin-recaptcha');
 puppeteer.use(
     RecaptchaPlugin({
       provider: { id: '2captcha', token: config.vars.two_captcha_token },
       visualFeedback: true // colorize reCAPTCHAs (violet = detected, green = solved)
     })
-  )
+);
+
+function delay(time) {
+    return new Promise(function(resolve) { 
+        setTimeout(resolve, time)
+    });
+ }
 
 class NeweggBot {
-    constructor({productURL, verbose = false}) {
-        this.productURL = productURL;
-        config.verbose = verbose;
+    constructor(browser) {
+        this.context = browser;
     }
-    async run(browser) {
-        await this._initPuppeteer(browser);
+    async _init() {
+        if (config.verbose) console.log("Opening new page...");
+        this.page = await this.context.newPage();
+        this.page.setDefaultTimeout(0);
+    }
+    async _solveCaptcha() {
+        // define abbreviated variables for code readability
+        // (these will be reserved variables for this class)
+        const p = this.page;
+        
+        delay(2000);
+        if (p.url().search(/areyouahuman/i) != -1) {
+            await p.solveRecaptchas();
+            delay(2000);
+            await Promise.all([
+                p.waitForNavigation(),
+                p.solveRecaptchas()
+            ]);
+            
+        }
+        
+    }
+}
+class NeweggSignInBot extends NeweggBot{
+    async run() {
+        await this._init();
         await this._signIn();
-        await this._monitorProduct();
-        await this._addProductToCart();
-        await this._checkout()
     }
-    async _initPuppeteer(browser) {
-        if (config.verbose) console.log("Initializing Puppeteer...");
-        if (config.verbose) console.log("Opening incognito context...");
-        this.context = await browser.createIncognitoBrowserContext();
+    async _init() {
         if (config.verbose) console.log("Opening new page...");
         this.page = await this.context.newPage();
         this.page.setDefaultTimeout(0);
@@ -46,11 +67,11 @@ class NeweggBot {
 
         // go to newegg.com
         if (config.verbose) console.log(`Going to ${config.base_url}...`);
+        console.log(p)
         await p.goto(config.base_url);
-
-        async function solveCaptchas() {
-            // ...todo: check for captcha page and solve captchas
-        }
+        
+        // check for/solve captcha
+        await this._solveCaptcha();
 
         // sign in
         if (config.verbose) console.log("Signing in...");
@@ -58,6 +79,9 @@ class NeweggBot {
         await p.waitForSelector(s.link);
         const signInURL = await p.$eval(s.link, el => el.getAttribute("href"));
         await p.goto(signInURL);
+        
+        // check for/solve captcha
+        await this._solveCaptcha();
 
         // wait until button is clickable
         async function checkButton() {
@@ -82,8 +106,26 @@ class NeweggBot {
         }
         await p.type(s.passwd, v.passwd), {delay: 5};
         await checkButton();
-        await p.click(s.continue);
-        await p.waitForNavigation();
+        await Promise.all([
+            p.waitForNavigation(),
+            p.click(s.continue),
+        ]);
+        
+        // check for/solve captcha
+        await this._solveCaptcha();
+    }
+}
+class NeweggMonitorBot extends NeweggBot{
+    constructor(browser, productURL) {
+        super(browser);
+        this.productURL = productURL;
+        this.combo = productURL.search(/combo/i) != -1;
+    }
+    async run() {
+        await this._init();
+        await this._monitorProduct();
+        await this._addProductToCart();
+        await this._checkout()
     }
     async _monitorProduct() {
         // define abbreviated variables for code readability
@@ -91,13 +133,16 @@ class NeweggBot {
         const p = this.page;
 
         if (config.verbose) console.log(`Going to ${this.productURL}`);
-        // await p.goto(this.productURL);
+        await p.goto(this.productURL);
+        
+        // check for/solve captcha
+        await this._solveCaptcha();
         
         if (config.verbose) console.log("Monitoring status...");
         const client = new undici.Client(config.base_url);
         async function _checkStatus(url) {
             return new Promise(function(resolve, reject) {
-                client.request({
+                setTimeout(() => {client.request({
                     "path": url,
                     "method": "GET",
                 }, function (err, data) {
@@ -119,12 +164,13 @@ class NeweggBot {
                         res += d;
                     });
                     body.on('end', () => {
+                        console.log(res);
                         if (res.search(/add to cart/i) != -1) {
                             resolve(true);
                         }
                         resolve(false);
                     })
-                });
+                })}, 10);
             });   
         }
 
@@ -147,17 +193,25 @@ class NeweggBot {
         await p.setCacheEnabled(false);
         await p.reload();
 
-        // 
+        await pause(10000);
+
+        const button = await p.$x("//a[contains(., 'Add to Cart ')]");
+        button[0].click();
     }
     async _checkout() {
 
     }
 }
 (async () => {
-    let browser = await puppeteer.launch(config.launch_settings);
-    let bot = new NeweggBot({
-        productURL: "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206669",
-        verbose: true
-    });
-    bot.run(browser);
+    if (config.verbose) console.log("Opening incognito chromium browser...");
+    const browser = await puppeteer.launch(config.launch_settings);
+    const context = await browser.createIncognitoBrowserContext();
+    let signInBot = new NeweggSignInBot(context);
+    await signInBot.run();
+    // let monitorBot = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
+    let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
+    await monitorBot.run();
+    // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
+    // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
+    test.run();
 })();
