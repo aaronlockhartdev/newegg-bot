@@ -1,0 +1,23 @@
+{
+    "verbose": true,
+    "vars": {
+        "two_captcha_token": "",
+        "email": "",
+        "passwd": "",
+        "csv": ""
+    },
+    "launch_settings": {
+        "headless": false,
+        "args": []
+    },
+    "selectors": {
+        "sign_in": {
+            "link": "a.nav-complex-inner",
+            "email": "[for=labeled-input-signEmail]",
+            "passwd": "[for=labeled-input-password]",
+            "continue": "#signInSubmit"
+        }
+        
+    }
+
+}

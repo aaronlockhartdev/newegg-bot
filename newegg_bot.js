@@ -19,7 +19,9 @@ function delay(time) {
     return new Promise(function(resolve) { 
         setTimeout(resolve, time)
     });
- }
+}
+
+const baseURL = "https://www.newegg.com/";
 
 class NeweggBot {
     constructor(browser) {
@@ -35,10 +37,10 @@ class NeweggBot {
         // (these will be reserved variables for this class)
         const p = this.page;
         
-        delay(2000);
+        await delay(2000);
         if (p.url().search(/areyouahuman/i) != -1) {
             await p.solveRecaptchas();
-            delay(2000);
+            await delay(2000);
             await Promise.all([
                 p.waitForNavigation(),
                 p.solveRecaptchas()
@@ -66,9 +68,9 @@ class NeweggSignInBot extends NeweggBot{
         const p = this.page;
 
         // go to newegg.com
-        if (config.verbose) console.log(`Going to ${config.base_url}...`);
+        if (config.verbose) console.log(`Going to ${baseURL}...`);
         console.log(p)
-        await p.goto(config.base_url);
+        await p.goto(baseURL);
         
         // check for/solve captcha
         await this._solveCaptcha();
@@ -97,7 +99,7 @@ class NeweggSignInBot extends NeweggBot{
         // sign in with email and password
         await p.waitForSelector(s.email);
         await p.type(s.email, v.email, {delay: 5});
-        await checkButton();
+        await delay(500);
         await p.click(s.continue);
         try {
             await p.waitForSelector(s.passwd, {timeout: 35000});
@@ -105,7 +107,7 @@ class NeweggSignInBot extends NeweggBot{
             console.log("Password not found, maybe you have to input a code?");
         }
         await p.type(s.passwd, v.passwd), {delay: 5};
-        await checkButton();
+        await delay(500);
         await Promise.all([
             p.waitForNavigation(),
             p.click(s.continue),
@@ -139,7 +141,7 @@ class NeweggMonitorBot extends NeweggBot{
         await this._solveCaptcha();
         
         if (config.verbose) console.log("Monitoring status...");
-        const client = new undici.Client(config.base_url);
+        const client = new undici.Client(baseURL);
         async function _checkStatus(url) {
             return new Promise(function(resolve, reject) {
                 setTimeout(() => {client.request({
@@ -164,7 +166,7 @@ class NeweggMonitorBot extends NeweggBot{
                         res += d;
                     });
                     body.on('end', () => {
-                        console.log(res);
+                        // console.log(res);
                         if (res.search(/add to cart/i) != -1) {
                             resolve(true);
                         }
@@ -188,15 +190,16 @@ class NeweggMonitorBot extends NeweggBot{
         const v = config.vars;
         const p = this.page;
 
-        // force page to update
-        if (config.verbose) console.log("Force refreshing page...");
-        await p.setCacheEnabled(false);
-        await p.reload();
+        if (this.combo) {
+            let string = "ItemList=Combo.";
+            let index = this.productURL.search(string) + string.length;
+            let id = this.productURL.slice(index, index + 7);
+            await p.evaluate((id) => {
+                Biz.Product.Cart.addCombo(id, '', '1', '0');
+            }, id);
+        }
 
-        await pause(10000);
-
-        const button = await p.$x("//a[contains(., 'Add to Cart ')]");
-        button[0].click();
+        await p.goto('https://secure.newegg.com/shop/cart')
     }
     async _checkout() {
 
@@ -208,10 +211,10 @@ class NeweggMonitorBot extends NeweggBot{
     const context = await browser.createIncognitoBrowserContext();
     let signInBot = new NeweggSignInBot(context);
     await signInBot.run();
-    // let monitorBot = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
-    let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
+    let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
+    // let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
     await monitorBot.run();
     // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
     // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
-    test.run();
+    // test.run();
 })();
