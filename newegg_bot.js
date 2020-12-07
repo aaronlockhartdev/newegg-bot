@@ -15,12 +15,14 @@ puppeteer.use(
     })
 );
 
+// simple async delay function 
 function delay(time) {
     return new Promise(function(resolve) { 
-        setTimeout(resolve, time)
+        setTimeout(resolve, time);
     });
 }
 
+// define constants
 const baseURL = "https://www.newegg.com/";
 
 class NeweggBot {
@@ -39,6 +41,7 @@ class NeweggBot {
         
         await delay(2000);
         if (p.url().search(/areyouahuman/i) != -1) {
+            if (config.verbose) console.log("Catpcha detected, solving...");
             await p.solveRecaptchas();
             await delay(2000);
             await Promise.all([
@@ -54,11 +57,6 @@ class NeweggSignInBot extends NeweggBot{
     async run() {
         await this._init();
         await this._signIn();
-    }
-    async _init() {
-        if (config.verbose) console.log("Opening new page...");
-        this.page = await this.context.newPage();
-        this.page.setDefaultTimeout(0);
     }
     async _signIn() {
         // define abbreviated variables for code readability
@@ -102,11 +100,13 @@ class NeweggSignInBot extends NeweggBot{
         await delay(500);
         await p.click(s.continue);
         try {
-            await p.waitForSelector(s.passwd, {timeout: 35000});
+            await p.waitForSelector(s.passwd, {timeout: 10000});
+            await p.type(s.passwd, v.passwd), {delay: 5};
         } catch (e) {
             console.log("Password not found, maybe you have to input a code?");
         }
-        await p.type(s.passwd, v.passwd), {delay: 5};
+        // TODO: ADD COMMAND LINE CODE ENTRANCE AND BLOCKING UNTIL THE CODE IS ENTERED!!
+        // FUTURE: POSSIBLY ADD EMAIL INTEGRATION FOR DIRECT CODE INPUT
         await delay(500);
         await Promise.all([
             p.waitForNavigation(),
@@ -121,7 +121,7 @@ class NeweggMonitorBot extends NeweggBot{
     constructor(browser, productURL) {
         super(browser);
         this.productURL = productURL;
-        this.combo = productURL.search(/combo/i) != -1;
+        this.combo = productURL.search(/combodeal/i) != -1;
     }
     async run() {
         await this._init();
@@ -186,22 +186,29 @@ class NeweggMonitorBot extends NeweggBot{
     async _addProductToCart() {
         // define abbreviated variables for code readability
         // (these will be reserved variables for this class)
-        const s = config.selectors.sign_in;
-        const v = config.vars;
         const p = this.page;
 
         if (this.combo) {
             let string = "ItemList=Combo.";
             let index = this.productURL.search(string) + string.length;
             let id = this.productURL.slice(index, index + 7);
-            await p.evaluate((id) => {
-                Biz.Product.Cart.addCombo(id, '', '1', '0');
-            }, id);
+            await Promise.all([
+                p.waitForNavigation(),
+                p.evaluate((id) => {
+                    Biz.Product.Cart.addCombo(id, '', '1', '0');
+                }, id)
+            ]);
+        } else {
+            // TODO: add support for regular items, not just combos
         }
-
-        await p.goto('https://secure.newegg.com/shop/cart')
     }
     async _checkout() {
+        // define abbreviated variables for code readability
+        // (these will be reserved variables for this class)
+        const s = config.selectors.checkout;
+        const v = config.vars;
+        const p = this.page;
+
 
     }
 }
@@ -211,10 +218,10 @@ class NeweggMonitorBot extends NeweggBot{
     const context = await browser.createIncognitoBrowserContext();
     let signInBot = new NeweggSignInBot(context);
     await signInBot.run();
-    let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
-    // let monitorBot = new NeweggMonitorBot(context, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
-    await monitorBot.run();
-    // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4190483");
-    // let test = new NeweggMonitorBot(browser, "https://www.newegg.com/Product/ComboDealDetails?ItemList=Combo.4206685");
-    // test.run();
+
+    let monitorBots = [];
+    for (let i = 0; i < config.products.length; i++) {
+        monitorBots.push(new NeweggMonitorBot(context, config.products[i]).run());
+    }
+    await Promise.all(monitorBots);
 })();
