@@ -15,11 +15,27 @@ puppeteer.use(
     })
 );
 
+// shim Promise.any if unsupported
+var any = require('promise.any');
+any.shim();
+
+
 // simple async delay function 
 function delay(time) {
     return new Promise(function(resolve) { 
         setTimeout(resolve, time);
     });
+}
+
+// random async delay function
+function delayRandom(timeMin, timeMax) {
+    return new Promise(function(resolve) {
+        setTimeout(resolve, random(timeMin, timeMax));
+    });
+}
+
+function random(min, max) {
+    return Math.random() * (max - min) + min;
 }
 
 // define constants
@@ -96,18 +112,18 @@ class NeweggSignInBot extends NeweggBot{
         
         // sign in with email and password
         await p.waitForSelector(s.email);
-        await p.type(s.email, v.email, {delay: 5});
-        await delay(500);
+        await p.type(s.email, v.email, {delay: random(5, 9)});
+        await delayRandom(500, 1000);
         await p.click(s.continue);
         try {
             await p.waitForSelector(s.passwd, {timeout: 10000});
-            await p.type(s.passwd, v.passwd), {delay: 5};
+            await p.type(s.passwd, v.passwd), {delay: random(5, 9)};
         } catch (e) {
             console.log("Password not found, maybe you have to input a code?");
         }
         // TODO: ADD COMMAND LINE CODE ENTRANCE AND BLOCKING UNTIL THE CODE IS ENTERED!!
         // FUTURE: POSSIBLY ADD EMAIL INTEGRATION FOR DIRECT CODE INPUT
-        await delay(500);
+        await delayRandom(500, 1000);
         await Promise.all([
             p.waitForNavigation(),
             p.click(s.continue),
@@ -133,6 +149,7 @@ class NeweggMonitorBot extends NeweggBot{
         // define abbreviated variables for code readability
         // (these will be reserved variables for this class)
         const p = this.page;
+        const s = config.selectors.monitor;
 
         if (config.verbose) console.log(`Going to ${this.productURL}`);
         await p.goto(this.productURL);
@@ -142,7 +159,7 @@ class NeweggMonitorBot extends NeweggBot{
         
         if (config.verbose) console.log("Monitoring status...");
         const client = new undici.Client(baseURL);
-        async function _checkStatus(url) {
+        async function _checkStatusRequest(url) {
             return new Promise(function(resolve, reject) {
                 setTimeout(() => {client.request({
                     "path": url,
@@ -158,7 +175,8 @@ class NeweggMonitorBot extends NeweggBot{
                         body
                     } = data;
                     
-                    if (statusCode !== 200 || !body) resolve(false);
+                    if (statusCode === 302) reject('302 returned');
+                    if (statusCode !== 200 || !body) reject();
                     
                     let res = '';
                     body.setEncoding('utf8');
@@ -167,40 +185,66 @@ class NeweggMonitorBot extends NeweggBot{
                     });
                     body.on('end', () => {
                         // console.log(res);
+                        // console.log(headers)
                         if (res.search(/add to cart/i) != -1) {
                             resolve(true);
                         }
                         resolve(false);
                     })
-                })}, 10);
+                })}, random(30, 40));
             });   
         }
 
-        let count = 0;
-        while (!(await _checkStatus(this.productURL))){
-            count++;
-            if (config.verbose) process.stdout.write(`Item out of stock, attempt ${count}...\r`);
-        }
-        client.close();
-    }
-    async _addProductToCart() {
-        // define abbreviated variables for code readability
-        // (these will be reserved variables for this class)
-        const p = this.page;
-
-        if (this.combo) {
-            let string = "ItemList=Combo.";
-            let index = this.productURL.search(string) + string.length;
-            let id = this.productURL.slice(index, index + 7);
-            await Promise.all([
-                p.waitForNavigation(),
-                p.evaluate((id) => {
-                    Biz.Product.Cart.addCombo(id, '', '1', '0');
-                }, id)
+        async function _checkStatusReload() {
+            await p.reload();
+            await Promise.any([
+                p.waitForXPath(s.add_cart),
+                p.waitForXPath(s.notify)
             ]);
-        } else {
-            // TODO: add support for regular items, not just combos
+            try {
+                await Promise.all([
+                    p.waitForNavigation(),
+                    async () => {
+                        const button = await p.$x(s.add_cart);
+                        await button[0].click();
+                    }
+                ])
+                return true;
+            } catch (err) {
+                return false;
+            }
         }
+        let count = 0;
+        try {
+            while (!(await _checkStatusRequest(this.productURL))){
+                count++;
+                if (config.verbose) process.stdout.write(`Item out of stock, attempt ${count}...\r`);
+            }
+            if (this.combo) {
+                let string = "ItemList=Combo.";
+                let index = this.productURL.search(string) + string.length;
+                let id = this.productURL.slice(index, index + 7);
+                await Promise.all([
+                    p.waitForNavigation(),
+                    p.evaluate((id) => {
+                        Biz.Product.Cart.addCombo(id, '', '1', '0');
+                    }, id)
+                ]);
+            } else {
+                // TODO: add support for regular items, not just combos
+            }
+            if (config.verbose) console.log("Added product to cart!");
+        } catch (err){
+            client.close();
+            if (err == '302 returned') {
+                if (config.verbose) console.log("They're onto us! Try using a VPN. Switching to alternate (slower) stock detection system.");
+            }
+        }
+        while (!(await _checkStatusReload())) {
+            count++;
+                if (config.verbose) process.stdout.write(`Item out of stock, attempt ${count}...\r`);
+        }
+
     }
     async _checkout() {
         // define abbreviated variables for code readability
@@ -209,7 +253,30 @@ class NeweggMonitorBot extends NeweggBot{
         const v = config.vars;
         const p = this.page;
 
+        if (config.verbose) console.log("Checking out...");
+        await p.waitForXPath(s.checkout);
+        const checkout = await p.$x(s.checkout);
+        await checkout[0].click();
+        if (config.verbose) console.log("Delivery...");
+        await p.waitForXPath(s.delivery);
+        const delivery = await p.$x(s.delivery);
+        await delivery[0].click();
+        if (config.verbose) console.log("Payment...");
+        await p.waitForXPath(s.payment);
+        const payment = await p.$x(s.payment);
+        await payment[0].click();
+        await p.waitForSelector(s.csv);
+        await p.type(s.csv, v.csv);
+        if (config.verbose) console.log("Reviewing order...");
+        await p.waitForXPath(s.review);
+        const review = await p.$x(s.review);
+        await review[0].click();
 
+        // BE VERY CAREFUL WHEN TESTING, DO NOT UNCOMMENT THE FOLLOWING LINES
+        // if (config.verbose) console.log("Placing order...");
+        // await p.waitForXPath(s.place);
+        // const place = await p.$x(s.place);
+        // await place[0].click();
     }
 }
 (async () => {

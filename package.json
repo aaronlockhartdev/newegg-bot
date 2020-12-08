@@ -18,6 +18,7 @@
   "homepage": "https://github.com/aaronlockhartdev/newegg-bot#readme",
   "devDependencies": {},
   "dependencies": {
+    "promise.any": "^2.0.1",
     "puppeteer": "^5.5.0",
     "puppeteer-extra": "^3.1.15",
     "puppeteer-extra-plugin-recaptcha": "^3.3.0",
