@@ -1,6 +1,7 @@
 const undici = require('undici');
 const puppeteer = require('puppeteer-extra');
-const config = require('./config/puppeteer.json');
+const config = require('./config.json');
+const selectors = require('./selectors.json')
 
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
@@ -77,7 +78,7 @@ class NeweggSignInBot extends NeweggBot{
     async _signIn() {
         // define abbreviated variables for code readability
         // (these will be reserved variables for this class)
-        const s = config.selectors.sign_in;
+        const s = selectors.sign_in;
         const v = config.vars;
         const p = this.page;
 
@@ -149,7 +150,7 @@ class NeweggMonitorBot extends NeweggBot{
         // define abbreviated variables for code readability
         // (these will be reserved variables for this class)
         const p = this.page;
-        const s = config.selectors.monitor;
+        const s = selectors.monitor;
 
         if (config.verbose) console.log(`Going to ${this.productURL}`);
         await p.goto(this.productURL);
@@ -249,7 +250,7 @@ class NeweggMonitorBot extends NeweggBot{
     async _checkout() {
         // define abbreviated variables for code readability
         // (these will be reserved variables for this class)
-        const s = config.selectors.checkout;
+        const s = selectors.checkout;
         const v = config.vars;
         const p = this.page;
 
