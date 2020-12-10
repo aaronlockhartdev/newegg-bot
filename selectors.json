@@ -1,23 +1,20 @@
 {
-    "selectors": {
-        "sign_in": {
-            "link": "a.nav-complex-inner",
-            "email": "[for=labeled-input-signEmail]",
-            "passwd": "[for=labeled-input-password]",
-            "continue": "#signInSubmit"
-        },
-        "monitor": {
-            "add_cart": "//a[contains(normalize-space(text()), 'Add to Cart')]",
-            "notify": "//a[contains(normalize-space(text()), 'Auto Notify')]"
-        },
-        "checkout": {
-            "checkout": "//button[contains(normalize-space(text()), 'Secure Checkout')]",
-            "delivery": "//button[contains(normalize-space(text()), 'Continue to delivery')]",
-            "payment": "//button[contains(normalize-space(text()), 'Continue to payment')]",
-            "csv": "div.retype-security-code",
-            "review": "//button[contains(normalize-space(text()), 'Review your order')]",
-            "place": "//button[contains(normalize-space(text()), 'Place Order')]"
-        }
-        
+    "sign_in": {
+        "link": "a.nav-complex-inner",
+        "email": "[for=labeled-input-signEmail]",
+        "passwd": "[for=labeled-input-password]",
+        "continue": "#signInSubmit"
+    },
+    "monitor": {
+        "add_cart": "//a[contains(normalize-space(text()), 'Add to Cart')]",
+        "notify": "//a[contains(normalize-space(text()), 'Auto Notify')]"
+    },
+    "checkout": {
+        "checkout": "//button[contains(normalize-space(text()), 'Secure Checkout')]",
+        "delivery": "//button[contains(normalize-space(text()), 'Continue to delivery')]",
+        "payment": "//button[contains(normalize-space(text()), 'Continue to payment')]",
+        "csv": "[placeholder='CVV2']",
+        "review": "//button[contains(normalize-space(text()), 'Review your order')]",
+        "place": "//button[contains(normalize-space(text()), 'Place Order')]"
     }
 }

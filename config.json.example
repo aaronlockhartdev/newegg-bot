@@ -7,7 +7,7 @@
         "two_captcha_token": "g844lceer97sh2a7sd7lhez1w26lapwx",
         "email": "john_doe@example.com",
         "passwd": "tJs4ktcExJ",
-        "csv": "1842"
+        "cvv": "1842"
     },
     "launch_settings": {
         "headless": false,
